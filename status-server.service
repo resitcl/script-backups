@@ -1,0 +1,21 @@
+# systemd unit for the backup status HTTP server
+# Install:
+#   sudo cp status-server.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now status-server
+
+[Unit]
+Description=Backup Status HTTP Server
+After=network.target
+
+[Service]
+Type=simple
+User=backupuser
+WorkingDirectory=/opt/db-backups
+EnvironmentFile=/opt/db-backups/.env
+ExecStart=/opt/db-backups/status-server.sh 8099
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
