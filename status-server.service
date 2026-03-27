@@ -10,7 +10,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=backupuser
+User=root
 WorkingDirectory=/opt/db-backups
 EnvironmentFile=/opt/db-backups/.env
 ExecStart=/opt/db-backups/status-server.sh 8099

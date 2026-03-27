@@ -3,11 +3,11 @@
 #              systemd service for the status server.
 #
 # Usage:  sudo bash install.sh [cron-schedule] [install-dir]
-#   cron-schedule  default: "0 2 * * *"  (daily 02:00 UTC)
+#   cron-schedule  default: "0 5 * * *"  (daily 05:00 UTC)
 #   install-dir    default: /opt/db-backups
 set -euo pipefail
 
-CRON_SCHEDULE="${1:-0 2 * * *}"
+CRON_SCHEDULE="${1:-0 5 * * *}"
 INSTALL_DIR="${2:-/opt/db-backups}"
 
 echo "Installing to ${INSTALL_DIR} ..."
