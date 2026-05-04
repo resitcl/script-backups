@@ -45,7 +45,6 @@ if $FRESH; then
 
   _prompt_required() {
     local label="$1" value=""
-    [[ ! -e /dev/tty ]] && { echo "ERROR: No terminal available for interactive prompts. Pre-create ${INSTALL_DIR}/.env to skip prompts." >&2; exit 1; }
     while [[ -z "$value" ]]; do
       read -rp "  ${label}: " value </dev/tty
     done
@@ -58,6 +57,7 @@ if $FRESH; then
     printf '%s' "${value:-$default}"
   }
 
+  [[ ! -e /dev/tty ]] && { echo "ERROR: No terminal available for interactive prompts. Pre-create ${INSTALL_DIR}/.env to skip prompts." >&2; exit 1; }
   echo ""
   echo "=== db-backups: first-time configuration ==="
 
