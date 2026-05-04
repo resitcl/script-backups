@@ -95,11 +95,17 @@ else
 fi
 
 # ── Delegate to install.sh ────────────────────────────────────────────────────
+# Pre-create INSTALL_DIR and a placeholder .env so install.sh skips its
+# "edit .env" message — bootstrap writes the real credentials below.
+mkdir -p "$INSTALL_DIR"
+$FRESH && touch "${INSTALL_DIR}/.env"
 bash "${WORK_DIR}/install.sh" "$CRON_SCHEDULE" "$INSTALL_DIR"
 
 # ── Write .env with real credentials (fresh install only) ─────────────────────
 if $FRESH; then
-  cat > "${INSTALL_DIR}/.env" <<EOF
+  _env_tmp="$(mktemp -p "$INSTALL_DIR")"
+  chmod 600 "$_env_tmp"
+  cat > "$_env_tmp" <<EOF
 S3_BUCKET=${S3_BUCKET}
 S3_PREFIX=db-backups
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -109,12 +115,13 @@ BACKUP_TMP_DIR=/tmp/db-backups
 S3_RETENTION_DAYS=${S3_RETENTION_DAYS}
 STATUS_FILE=/var/www/backup-status/status.json
 EOF
-  chmod 600 "${INSTALL_DIR}/.env"
+  mv "$_env_tmp" "${INSTALL_DIR}/.env"
   echo "Credentials written to ${INSTALL_DIR}/.env"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
-SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || echo '<server-ip>')"
+SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+[[ -z "$SERVER_IP" ]] && SERVER_IP="<server-ip>"
 echo ""
 echo "============================================="
 echo "  db-backups ready"
