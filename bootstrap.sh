@@ -25,3 +25,14 @@ fi
 # ── Tmpdir (auto-removed on exit) ─────────────────────────────────────────────
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
+
+# ── Download files from GitHub raw ────────────────────────────────────────────
+echo "Downloading scripts from GitHub..."
+for f in "${FILES[@]}"; do
+  if ! curl -fsSL "${REPO_RAW}/${f}" -o "${WORK_DIR}/${f}"; then
+    echo "ERROR: Failed to download ${f} from ${REPO_RAW}/${f}" >&2
+    exit 1
+  fi
+done
+chmod +x "${WORK_DIR}/backup.sh" "${WORK_DIR}/status-server.sh" "${WORK_DIR}/install.sh"
+echo "Download complete."
