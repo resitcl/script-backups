@@ -150,7 +150,7 @@ The AWS credentials in `.env` need only these S3 actions:
 ### One-command install (recommended)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/USER/REPO/main/bootstrap.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/resitcl/script-backups/main/bootstrap.sh | sudo bash
 ```
 
 The installer will prompt for S3 credentials and cron schedule, then configure cron and systemd automatically.
@@ -158,7 +158,7 @@ The installer will prompt for S3 credentials and cron schedule, then configure c
 **To pre-set the cron schedule** (skips that prompt):
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/USER/REPO/main/bootstrap.sh | sudo bash -s -- "0 3 * * *"
+curl -sSL https://raw.githubusercontent.com/resitcl/script-backups/main/bootstrap.sh | sudo bash -s -- "0 3 * * *"
 ```
 
 ### Update
@@ -166,13 +166,13 @@ curl -sSL https://raw.githubusercontent.com/USER/REPO/main/bootstrap.sh | sudo b
 Re-run the same curl command. Your `.env` and cron schedule are preserved — only the scripts are updated.
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/USER/REPO/main/bootstrap.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/resitcl/script-backups/main/bootstrap.sh | sudo bash
 ```
 
 ### Manual install (from a local clone)
 
 ```bash
-git clone https://github.com/USER/REPO.git /tmp/db-backups-src
+git clone https://github.com/resitcl/script-backups.git /tmp/db-backups-src
 cd /tmp/db-backups-src
 cp .env.example .env
 nano .env   # fill in S3 credentials

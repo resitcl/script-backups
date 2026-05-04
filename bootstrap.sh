@@ -2,7 +2,7 @@
 # bootstrap.sh — one-command installer / updater for db-backups.
 #
 # Usage (fresh install):
-#   curl -sSL https://raw.githubusercontent.com/USER/REPO/main/bootstrap.sh | sudo bash
+#   curl -sSL https://raw.githubusercontent.com/resitcl/script-backups/main/bootstrap.sh | sudo bash
 #
 # Usage (pre-set cron schedule, skip that prompt):
 #   curl -sSL .../bootstrap.sh | sudo bash -s -- "0 3 * * *" /opt/db-backups
@@ -10,7 +10,7 @@
 # Re-run to update scripts without touching .env or cron.
 set -euo pipefail
 
-REPO_RAW="https://raw.githubusercontent.com/USER/REPO/main"
+REPO_RAW="https://raw.githubusercontent.com/resitcl/script-backups/main"
 CRON_ARG="${1:-}"
 INSTALL_DIR="${2:-/opt/db-backups}"
 
