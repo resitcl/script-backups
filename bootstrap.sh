@@ -45,15 +45,16 @@ if $FRESH; then
 
   _prompt_required() {
     local label="$1" value=""
+    [[ ! -e /dev/tty ]] && { echo "ERROR: No terminal available for interactive prompts. Pre-create ${INSTALL_DIR}/.env to skip prompts." >&2; exit 1; }
     while [[ -z "$value" ]]; do
-      read -rp "  ${label}: " value
+      read -rp "  ${label}: " value </dev/tty
     done
     printf '%s' "$value"
   }
 
   _prompt_optional() {
     local label="$1" default="$2" value
-    read -rp "  ${label} [${default}]: " value
+    read -rp "  ${label} [${default}]: " value </dev/tty
     printf '%s' "${value:-$default}"
   }
 
@@ -62,7 +63,7 @@ if $FRESH; then
 
   S3_BUCKET="$(_prompt_required    'S3 bucket name')"
   AWS_ACCESS_KEY_ID="$(_prompt_required 'AWS Access Key ID')"
-  read -rsp "  AWS Secret Access Key: " AWS_SECRET_ACCESS_KEY; echo
+  read -rsp "  AWS Secret Access Key: " AWS_SECRET_ACCESS_KEY </dev/tty; echo
   [[ -z "$AWS_SECRET_ACCESS_KEY" ]] && { echo "ERROR: AWS Secret Access Key is required." >&2; exit 1; }
   AWS_DEFAULT_REGION="$(_prompt_optional 'AWS region'        'us-east-1')"
   S3_RETENTION_DAYS="$(_prompt_optional  'Retention days'    '30')"
@@ -78,8 +79,14 @@ if $FRESH; then
 else
   # ── Update path: read existing cron schedule ──────────────────────────────
   CRON_FILE="/etc/cron.d/db-backups"
-  if [[ -f "$CRON_FILE" ]] && grep -qv '^#' "$CRON_FILE" 2>/dev/null; then
-    CRON_SCHEDULE="$(grep -v '^#' "$CRON_FILE" | head -1 | awk '{print $1" "$2" "$3" "$4" "$5}')"
+  if [[ -f "$CRON_FILE" ]]; then
+    _raw_cron="$(grep -v '^#' "$CRON_FILE" | grep -v '^[[:space:]]*$' | head -1)"
+    _sched="$(awk '{print $1" "$2" "$3" "$4" "$5}' <<< "$_raw_cron" 2>/dev/null || true)"
+    if [[ "$_sched" =~ ^[0-9\*/,-] ]]; then
+      CRON_SCHEDULE="$_sched"
+    else
+      CRON_SCHEDULE="${CRON_ARG:-0 5 * * *}"
+    fi
   else
     CRON_SCHEDULE="${CRON_ARG:-0 5 * * *}"
   fi
