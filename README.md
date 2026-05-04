@@ -147,32 +147,36 @@ The AWS credentials in `.env` need only these S3 actions:
 
 ## Installation
 
+### One-command install (recommended)
+
 ```bash
-# 1. Clone / copy this repo to the server
-git clone <repo-url> /opt/db-backups
-cd /opt/db-backups
-
-# 2. Create .env from the example and fill in S3 credentials
-cp .env.example .env
-nano .env
-
-# 3. Run the installer (requires root for cron.d and systemd)
-#    Optionally pass a custom cron schedule as first argument
-sudo bash install.sh "0 2 * * *"
+curl -sSL https://raw.githubusercontent.com/USER/REPO/main/bootstrap.sh | sudo bash
 ```
 
-The installer:
-- Copies scripts to `/opt/db-backups/`
-- Registers a cron job in `/etc/cron.d/db-backups`
-- Enables and starts the `backup-status-server` systemd service on port **8099**
+The installer will prompt for S3 credentials and cron schedule, then configure cron and systemd automatically.
 
-### Manual run (for testing)
+**To pre-set the cron schedule** (skips that prompt):
 
 ```bash
-/opt/db-backups/backup.sh
+curl -sSL https://raw.githubusercontent.com/USER/REPO/main/bootstrap.sh | sudo bash -s -- "0 3 * * *"
+```
 
-# Follow live output
-tail -f /var/log/db-backup.log
+### Update
+
+Re-run the same curl command. Your `.env` and cron schedule are preserved — only the scripts are updated.
+
+```bash
+curl -sSL https://raw.githubusercontent.com/USER/REPO/main/bootstrap.sh | sudo bash
+```
+
+### Manual install (from a local clone)
+
+```bash
+git clone https://github.com/USER/REPO.git /tmp/db-backups-src
+cd /tmp/db-backups-src
+cp .env.example .env
+nano .env   # fill in S3 credentials
+sudo bash install.sh "0 5 * * *"
 ```
 
 ---
