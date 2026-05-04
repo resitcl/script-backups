@@ -98,23 +98,21 @@ fi
 # Pre-create INSTALL_DIR and a placeholder .env so install.sh skips its
 # "edit .env" message — bootstrap writes the real credentials below.
 mkdir -p "$INSTALL_DIR"
-$FRESH && touch "${INSTALL_DIR}/.env"
-bash "${WORK_DIR}/install.sh" "$CRON_SCHEDULE" "$INSTALL_DIR"
+$FRESH && install -m 600 /dev/null "${INSTALL_DIR}/.env"
+( cd "$WORK_DIR" && bash ./install.sh "$CRON_SCHEDULE" "$INSTALL_DIR" )
 
 # ── Write .env with real credentials (fresh install only) ─────────────────────
 if $FRESH; then
   _env_tmp="$(mktemp -p "$INSTALL_DIR")"
   chmod 600 "$_env_tmp"
-  cat > "$_env_tmp" <<EOF
-S3_BUCKET=${S3_BUCKET}
-S3_PREFIX=db-backups
-AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
-BACKUP_TMP_DIR=/tmp/db-backups
-S3_RETENTION_DAYS=${S3_RETENTION_DAYS}
-STATUS_FILE=/var/www/backup-status/status.json
-EOF
+  printf 'S3_BUCKET=%s\n'              "$S3_BUCKET"              >> "$_env_tmp"
+  printf 'S3_PREFIX=%s\n'              "db-backups"              >> "$_env_tmp"
+  printf 'AWS_ACCESS_KEY_ID=%s\n'      "$AWS_ACCESS_KEY_ID"      >> "$_env_tmp"
+  printf 'AWS_SECRET_ACCESS_KEY=%s\n'  "$AWS_SECRET_ACCESS_KEY"  >> "$_env_tmp"
+  printf 'AWS_DEFAULT_REGION=%s\n'     "$AWS_DEFAULT_REGION"     >> "$_env_tmp"
+  printf 'BACKUP_TMP_DIR=%s\n'         "/tmp/db-backups"         >> "$_env_tmp"
+  printf 'S3_RETENTION_DAYS=%s\n'      "$S3_RETENTION_DAYS"      >> "$_env_tmp"
+  printf 'STATUS_FILE=%s\n'            "/var/www/backup-status/status.json" >> "$_env_tmp"
   mv "$_env_tmp" "${INSTALL_DIR}/.env"
   echo "Credentials written to ${INSTALL_DIR}/.env"
 fi
