@@ -35,10 +35,10 @@ fail() { log "ERROR: $*"; }
 
 # ─── Per-container result tracking ───────────────────────────────────────────
 # Keys use format  "project::service"  (double-colon avoids clashing with paths)
-declare -A RESULT_STATUS   # → ok | failed | skipped
-declare -A RESULT_ERROR    # → error message or ""
-declare -A RESULT_SIZE     # → compressed bytes
-declare -A RESULT_S3KEY    # → s3 key on success
+declare -A RESULT_STATUS=()   # → ok | failed | skipped
+declare -A RESULT_ERROR=()    # → error message or ""
+declare -A RESULT_SIZE=()     # → compressed bytes
+declare -A RESULT_S3KEY=()    # → s3 key on success
 OVERALL="success"
 
 record_ok() {
@@ -273,7 +273,7 @@ discover_and_backup() {
         ((found++)) || true
         backup_mysql "$container" "$project" "$service" || true
         ;;
-      mongo|mongodb)
+      *mongo*)
         ((found++)) || true
         backup_mongo "$container" "$project" "$service" || true
         ;;
