@@ -93,3 +93,34 @@ else
   echo "Updating existing installation in ${INSTALL_DIR}..."
   echo "Cron schedule preserved: ${CRON_SCHEDULE}"
 fi
+
+# ── Delegate to install.sh ────────────────────────────────────────────────────
+bash "${WORK_DIR}/install.sh" "$CRON_SCHEDULE" "$INSTALL_DIR"
+
+# ── Write .env with real credentials (fresh install only) ─────────────────────
+if $FRESH; then
+  cat > "${INSTALL_DIR}/.env" <<EOF
+S3_BUCKET=${S3_BUCKET}
+S3_PREFIX=db-backups
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+BACKUP_TMP_DIR=/tmp/db-backups
+S3_RETENTION_DAYS=${S3_RETENTION_DAYS}
+STATUS_FILE=/var/www/backup-status/status.json
+EOF
+  chmod 600 "${INSTALL_DIR}/.env"
+  echo "Credentials written to ${INSTALL_DIR}/.env"
+fi
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || echo '<server-ip>')"
+echo ""
+echo "============================================="
+echo "  db-backups ready"
+echo "  Install dir:    ${INSTALL_DIR}"
+echo "  Cron schedule:  ${CRON_SCHEDULE} (UTC)"
+echo "  Status:         http://${SERVER_IP}:8099/status"
+echo "  Manual test:    ${INSTALL_DIR}/backup.sh"
+echo "  Logs:           tail -f /var/log/db-backup.log"
+echo "============================================="
