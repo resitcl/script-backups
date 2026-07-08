@@ -33,6 +33,10 @@ Host server
 
 No list of projects or containers needs to be maintained. New projects are picked up automatically on the next run.
 
+> **Databases only cover structured data.** Apps that keep user uploads or media
+> on disk (WordPress `wp-content`, upload folders, docker volumes) also need
+> those files archived — see [File storage](#file-storage) below.
+
 ### 2. Credential extraction
 
 Credentials are read from each container's own environment variables via `docker inspect`. No passwords are stored in the backup config.
@@ -99,6 +103,39 @@ After every run `backup.sh` writes a JSON file that `status-server.sh` serves ov
 ```
 
 `overall` is `"success"` only when **all** discovered databases backed up and uploaded correctly. A single failure sets it to `"failed"`.
+
+### 6. File storage
+
+Databases are not the whole story. Apps that store user uploads or media on disk
+lose that data on a DB-only restore. Set `FILESTORE_PATHS` in `.env` to a
+semicolon-separated list of `name:/absolute/path` entries; each path is
+`tar`+`gzip`'d and uploaded alongside the database dumps:
+
+```
+FILESTORE_PATHS="wordpress:/var/lib/docker/volumes/site_wordpress/_data;myapp:/home/user/app/uploads"
+```
+
+S3 layout for file storage:
+
+```
+{S3_PREFIX}/
+  wordpress/
+    filestore/
+      20260708_020001_wordpress.tar.gz
+  myapp/
+    filestore/
+      20260708_020003_myapp.tar.gz
+```
+
+Root-owned paths (docker volume directories under `/var/lib/docker/volumes`) are
+read via passwordless `sudo`; the cron job runs as `root`, so this is only
+relevant for manual runs. File-storage results appear in the status JSON keyed as
+`{name}::filestore`, exactly like databases, and are subject to the same
+`S3_RETENTION_DAYS` cleanup.
+
+> Not every app needs this: if uploads already live in object storage (e.g. an
+> app that writes documents straight to its own S3 bucket), only its database
+> needs backing up here.
 
 ---
 
@@ -190,6 +227,7 @@ sudo bash install.sh "0 5 * * *"
 | `AWS_ACCESS_KEY_ID` | yes | — | IAM access key |
 | `AWS_SECRET_ACCESS_KEY` | yes | — | IAM secret key |
 | `AWS_DEFAULT_REGION` | no | `us-east-1` | AWS region |
+| `FILESTORE_PATHS` | no | `""` | Semicolon-separated `name:/path` list of on-disk file storage to archive (see below) |
 | `BACKUP_TMP_DIR` | no | `/tmp/db-backups` | Local staging directory |
 | `S3_RETENTION_DAYS` | no | `30` | Delete S3 objects older than N days. `0` disables |
 | `STATUS_FILE` | no | `/var/www/backup-status/status.json` | Path of the status JSON |

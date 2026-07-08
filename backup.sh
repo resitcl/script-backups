@@ -246,6 +246,89 @@ backup_mongo() {
   rm -f "$local_path"
 }
 
+# ─── File storage backup ──────────────────────────────────────────────────────
+# Archives a directory tree (docker volume dir, bind-mount dir, uploads folder…)
+# to a gzip'd tarball and uploads it to S3. Databases only cover structured data;
+# apps that keep user uploads / media on disk (WordPress wp-content, upload dirs)
+# need this to be fully restorable.
+#
+# S3 layout:  {S3_PREFIX}/{name}/filestore/{TIMESTAMP}_{name}.tar.gz
+backup_filestore() {
+  local name="$1" path="$2"
+  local key="${name}::filestore"
+  log "[filestore][${name}] Archiving ${path} ..."
+
+  if [[ ! -e "$path" ]]; then
+    fail "[filestore][${name}] Path not found: ${path}"
+    record_fail "$key" "path not found: ${path}"
+    return
+  fi
+
+  # Docker volume dirs live under /var/lib/docker/volumes and are root-owned.
+  # If the current user cannot read the tree, fall back to passwordless sudo.
+  local -a tar_cmd=(tar)
+  if [[ ! -r "$path" ]]; then
+    if sudo -n true 2>/dev/null; then
+      tar_cmd=(sudo -n tar)
+    else
+      fail "[filestore][${name}] No read access to ${path} and passwordless sudo unavailable"
+      record_fail "$key" "no read access (need root/sudo)"
+      return
+    fi
+  fi
+
+  local filename="${TIMESTAMP}_${name}.tar.gz"
+  local local_path="${BACKUP_TMP_DIR}/filestore_${filename}"
+  local s3_key="${S3_PREFIX}/${name}/filestore/${filename}"
+
+  # Archive relative to the parent so the tarball has a clean top-level dir.
+  local parent base
+  parent="$(dirname "$path")"
+  base="$(basename "$path")"
+
+  if "${tar_cmd[@]}" -C "$parent" -czf "$local_path" "$base" 2>>"$LOG_FILE"; then
+    # sudo tar leaves the file root-owned; make sure we can stat/remove it.
+    [[ "${tar_cmd[0]}" == "sudo" ]] && sudo -n chown "$(id -u):$(id -g)" "$local_path" 2>/dev/null || true
+    local size
+    size=$(stat -c%s "$local_path")
+    log "[filestore][${name}] Archive OK ($(numfmt --to=iec "$size")). Uploading..."
+    if upload_to_s3 "$local_path" "$s3_key"; then
+      log "[filestore][${name}] Upload OK → s3://${S3_BUCKET}/${s3_key}"
+      record_ok "$key" "$size" "$s3_key"
+    else
+      fail "[filestore][${name}] S3 upload failed"
+      record_fail "$key" "S3 upload failed"
+    fi
+  else
+    fail "[filestore][${name}] tar failed — see log for details"
+    record_fail "$key" "tar failed"
+  fi
+  rm -f "$local_path"
+}
+
+# Iterate the configured FILESTORE_PATHS list: "name:/path;name2:/path2;…"
+backup_all_filestores() {
+  [[ -z "${FILESTORE_PATHS:-}" ]] && return
+  log "Processing configured file storage paths..."
+  local found=0 entry name path
+  local -a entries
+  IFS=';' read -ra entries <<< "$FILESTORE_PATHS"
+  for entry in "${entries[@]}"; do
+    entry="${entry#"${entry%%[![:space:]]*}"}"   # ltrim
+    entry="${entry%"${entry##*[![:space:]]}"}"   # rtrim
+    [[ -z "$entry" ]] && continue
+    name="${entry%%:*}"
+    path="${entry#*:}"
+    if [[ -z "$name" || -z "$path" || "$name" == "$entry" ]]; then
+      log "WARNING: malformed FILESTORE_PATHS entry '${entry}' (expected name:/path) — skipping"
+      continue
+    fi
+    ((found++)) || true
+    backup_filestore "$name" "$path" || true
+  done
+  log "Processed ${found} file storage path(s)."
+}
+
 # ─── Autodiscovery ────────────────────────────────────────────────────────────
 discover_and_backup() {
   log "Discovering database containers via docker ps..."
@@ -361,6 +444,8 @@ EOF
 log "======== Backup run ${TIMESTAMP} ========"
 
 discover_and_backup
+
+backup_all_filestores
 
 apply_s3_retention || true
 

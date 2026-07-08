@@ -30,14 +30,15 @@ tail -f /var/log/db-backup.log
 2. **Credential extraction** — for each matched container, `container_env()` reads env vars via `docker inspect` (no passwords stored in config).
 3. **Dump + compress** — runs the appropriate dump tool inside the container via `docker exec`, piping stdout directly to `gzip`. No uncompressed file is ever written to disk.
 4. **S3 upload** — `upload_to_s3()` calls `aws s3 cp --storage-class STANDARD_IA`.
-5. **Retention** (`apply_s3_retention`) — lists S3 objects older than `S3_RETENTION_DAYS` and deletes them.
-6. **Status write** (`write_status`) — writes a single JSON file to `STATUS_FILE`. This is what `status-server.sh` serves.
+5. **File storage** (`backup_all_filestores` → `backup_filestore`) — optional. Iterates the `FILESTORE_PATHS` env list (`name:/path;…`), `tar`+`gzip`s each directory and uploads to `{S3_PREFIX}/{name}/filestore/{TS}_{name}.tar.gz`. Root-owned paths (docker volumes) are read via passwordless `sudo`. Skipped entirely when `FILESTORE_PATHS` is empty.
+6. **Retention** (`apply_s3_retention`) — lists S3 objects older than `S3_RETENTION_DAYS` and deletes them (covers both DB dumps and filestore tarballs — same prefix).
+7. **Status write** (`write_status`) — writes a single JSON file to `STATUS_FILE`. This is what `status-server.sh` serves.
 
 `status-server.sh` is a self-contained Python 3 heredoc HTTP server embedded inside the bash script. It serves only `GET /status`, returning HTTP 200 when `overall == "success"` and 503 otherwise.
 
 ## Key conventions
 
-- **Result tracking**: Four `declare -A` associative arrays (`RESULT_STATUS`, `RESULT_ERROR`, `RESULT_SIZE`, `RESULT_S3KEY`) accumulate results keyed by `"project::service"`. Call `record_ok` or `record_fail` — never set the arrays directly.
+- **Result tracking**: Four `declare -A` associative arrays (`RESULT_STATUS`, `RESULT_ERROR`, `RESULT_SIZE`, `RESULT_S3KEY`) accumulate results keyed by `"project::service"` for databases and `"name::filestore"` for file storage. Call `record_ok` or `record_fail` — never set the arrays directly. `write_status` is generic over the keys, so new result types show up in the status JSON automatically.
 - **Non-fatal failures**: Every per-container backup call is suffixed with `|| true` so one failing DB never aborts the rest. `OVERALL` is set to `"failed"` by `record_fail` and never reset to `"success"`.
 - **Image matching**: Done on the base name only (tag and registry prefix stripped). To add a new engine, add a case branch in `discover_and_backup` and a corresponding `backup_<engine>()` function following the existing pattern.
 - **S3 path**: `{S3_PREFIX}/{project}/{db_type}/{TIMESTAMP}_{service}.{ext}` — project and service come from the `com.docker.compose.project` / `com.docker.compose.service` Docker labels, falling back to the container name.
