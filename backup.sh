@@ -211,6 +211,17 @@ backup_mongo() {
     return
   fi
 
+  # Port precedence:  MONGO_PORT env override (set in .env)  >  autodetect from
+  # the running mongod process (`--port N`)  >  default 27017. Autodetect covers
+  # containers that listen on a non-default port (e.g. `mongod --port 27018`);
+  # MONGO_PORT is the manual escape hatch for cases detection can't cover.
+  local mongo_port="${MONGO_PORT:-}"
+  if [[ -z "$mongo_port" ]]; then
+    mongo_port="$(docker exec "$container" cat /proc/1/cmdline 2>/dev/null \
+      | tr '\0' ' ' | grep -oE -- '--port[ =]+[0-9]+' | grep -oE '[0-9]+' | head -1)"
+  fi
+  [[ -z "$mongo_port" ]] && mongo_port=27017
+
   local filename="${TIMESTAMP}_${service}.archive.gz"
   local local_path="${BACKUP_TMP_DIR}/${project}_${filename}"
   local s3_key="${S3_PREFIX}/${project}/mongodb/${filename}"
@@ -219,10 +230,11 @@ backup_mongo() {
   local db_arg=""
   [[ -n "$mongo_db" ]] && db_arg="--db $mongo_db"
 
-  log "[mongodb][${project}/${service}] Dumping ${mongo_db:-all databases}..."
+  log "[mongodb][${project}/${service}] Dumping ${mongo_db:-all databases} (port ${mongo_port})..."
   # shellcheck disable=SC2086
   if docker exec "$container" \
       mongodump \
+        --port "$mongo_port" \
         --username "$mongo_user" \
         --password "$mongo_pass" \
         --authenticationDatabase admin \
