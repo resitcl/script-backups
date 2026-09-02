@@ -62,9 +62,10 @@ Per-server procedure (first install):
      IdentitiesOnly yes
    ```
 2. `git clone git@github.com-scriptbackups:resitcl/script-backups.git ~/script-backups`
-3. `cd ~/script-backups && sudo bash install.sh "0 2 * * *"` — installs to `/opt/db-backups`, writes `/etc/cron.d/db-backups`, and enables the `backup-status-server` systemd unit (port 8099).
-4. Fill `/opt/db-backups/.env`: copy the S3 credentials from an existing server's `/opt/db-backups/.env` (they are shared across the fleet) and set a **per-server `S3_PREFIX`** so backups don't collide in the bucket. Add `FILESTORE_PATHS` for any on-disk data (WordPress `wp-content`, upload dirs).
-5. Validate: `sudo /opt/db-backups/backup.sh`, then `curl -s -o /dev/null -w '%{http_code}' localhost:8099/status` (expect `200`, i.e. last run `overall == success`).
+3. Make sure the **AWS CLI v2** is present (`aws --version`) — `install.sh` does not install it, and `backup.sh` fails at the upload step without it.
+4. `cd ~/script-backups && sudo bash install.sh "0 2 * * *"` — installs to `/opt/db-backups`, writes `/etc/cron.d/db-backups`, and enables the `backup-status-server` systemd unit (port 8099).
+5. Fill `/opt/db-backups/.env`: copy the S3 credentials from an existing server's `/opt/db-backups/.env` (they are shared across the fleet) and set a **per-server `S3_PREFIX`** so backups don't collide in the bucket. Add `FILESTORE_PATHS` for any on-disk data (WordPress `wp-content`, upload dirs).
+6. Validate: `sudo /opt/db-backups/backup.sh`, then `curl -s -o /dev/null -w '%{http_code}' localhost:8099/status` (expect `200`, i.e. last run `overall == success`).
 
 To update an already-deployed server: `cd ~/script-backups && git pull && sudo cp backup.sh status-server.sh /opt/db-backups/` (re-running `install.sh` is also safe — it never overwrites an existing `.env`).
 
@@ -75,3 +76,10 @@ To update an already-deployed server: `cd ~/script-backups && git pull && sudo c
   - Databases (autodiscovered): `foroinnovacion/mysql`, `gestdoc-docker/mongo` (**port 27018**), `tiserx/postgres`.
   - Filestore: `wordpress-foroinnovacion` → foroinnovacion `wp-content` docker volume; `tiserx` → `/home/azureuser/tiserx/server/uploads`.
   - Schedule: daily 02:00. gestdoc's on-disk documents are intentionally **not** in `FILESTORE_PATHS` — they already live in the `gestdoc-documents` S3 bucket; only its mongo DB is dumped here.
+
+- **tarjetavecino-lacisterna** (AWS, `3.151.125.6`, `ubuntu`, key `tvlacisterna.pem`, servers.csv #36)
+  - S3: bucket `resit-prod-2026`, prefix `db-backups-tarjetavecino` (S3 creds copied from azure-prod-1).
+  - Databases (autodiscovered): `backend/postgres` (`tarjeta_vecino`), `wp-stack/wp-db` (**mariadb:11** — the first MariaDB host in the fleet; see the `MARIADB_*` / `mariadb-dump` support in `backup_mysql`).
+  - Filestore: `wordpress` → `wp-stack_wp_html` docker volume (WordPress install plus `wp-content/uploads`); `uploads-pendientes` → `backend_uploads_pendientes` volume (citizen ID scans and receipts — empty until the platform goes live, but wired up from day one).
+  - The WordPress theme and mu-plugins are intentionally **not** in `FILESTORE_PATHS` — they are versioned in `resitcl/tarjetavecino-wp`.
+  - Schedule: daily 02:00. The AWS CLI was missing on this host and had to be installed by hand.
