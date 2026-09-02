@@ -141,20 +141,25 @@ backup_mysql() {
   log "[mysql][${project}/${service}] Reading credentials from container env..."
 
   local my_user my_pass my_db
-  # Prefer explicit user; fall back to root
+  # Prefer explicit user; fall back to root. The mariadb image sets MARIADB_*
+  # and ships no MYSQL_* aliases, so check both prefixes.
   my_user="$(container_env "$container" MYSQL_USER)"
   my_pass="$(container_env "$container" MYSQL_PASSWORD)"
   my_db="$(container_env "$container" MYSQL_DATABASE)"
+  [[ -z "$my_user" ]] && my_user="$(container_env "$container" MARIADB_USER)"
+  [[ -z "$my_pass" ]] && my_pass="$(container_env "$container" MARIADB_PASSWORD)"
+  [[ -z "$my_db"   ]] && my_db="$(container_env "$container" MARIADB_DATABASE)"
 
   # If no regular user, try root
   if [[ -z "$my_pass" ]]; then
     my_user="root"
     my_pass="$(container_env "$container" MYSQL_ROOT_PASSWORD)"
+    [[ -z "$my_pass" ]] && my_pass="$(container_env "$container" MARIADB_ROOT_PASSWORD)"
   fi
   my_user="${my_user:-root}"
 
   if [[ -z "$my_pass" ]]; then
-    fail "[mysql][${project}/${service}] No password found (MYSQL_PASSWORD / MYSQL_ROOT_PASSWORD) — skipping"
+    fail "[mysql][${project}/${service}] No password found (MYSQL_/MARIADB_ PASSWORD or ROOT_PASSWORD) — skipping"
     record_fail "$key" "No MySQL password found in container env"
     return
   fi
@@ -171,9 +176,15 @@ backup_mysql() {
   local local_path="${BACKUP_TMP_DIR}/${project}_${filename}"
   local s3_key="${S3_PREFIX}/${project}/mysql/${filename}"
 
-  log "[mysql][${project}/${service}] Dumping ${dump_args}..."
+  # MariaDB 11 dropped the mysqldump symlink and ships mariadb-dump instead.
+  local dump_bin="mysqldump"
+  if ! docker exec "$container" sh -c 'command -v mysqldump' >/dev/null 2>&1; then
+    dump_bin="mariadb-dump"
+  fi
+
+  log "[mysql][${project}/${service}] Dumping ${dump_args} with ${dump_bin}..."
   if docker exec "$container" \
-      mysqldump -u "$my_user" -p"$my_pass" \
+      "$dump_bin" -u "$my_user" -p"$my_pass" \
         --single-transaction --quick \
         $dump_args \
     | gzip > "$local_path" 2>>"$LOG_FILE"; then
@@ -188,8 +199,8 @@ backup_mysql() {
       record_fail "$key" "S3 upload failed"
     fi
   else
-    fail "[mysql][${project}/${service}] mysqldump failed — see log for details"
-    record_fail "$key" "mysqldump failed"
+    fail "[mysql][${project}/${service}] ${dump_bin} failed — see log for details"
+    record_fail "$key" "${dump_bin} failed"
   fi
   rm -f "$local_path"
 }
