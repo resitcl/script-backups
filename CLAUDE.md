@@ -83,3 +83,7 @@ To update an already-deployed server: `cd ~/script-backups && git pull && sudo c
   - Filestore: `wordpress` → `wp-stack_wp_html` docker volume (WordPress install plus `wp-content/uploads`); `uploads-pendientes` → `backend_uploads_pendientes` volume (citizen ID scans and receipts — empty until the platform goes live, but wired up from day one).
   - The WordPress theme and mu-plugins are intentionally **not** in `FILESTORE_PATHS` — they are versioned in `resitcl/tarjetavecino-wp`.
   - Schedule: daily 02:00. The AWS CLI was missing on this host and had to be installed by hand.
+
+## SQL Server on Windows (`mssql/`)
+
+Everything above is for the Linux/Docker fleet. Hosts that run **Microsoft SQL Server directly on Windows** use the separate, self-contained `mssql/` folder: `backup-mssql.ps1` (native `BACKUP DATABASE` + `RESTORE VERIFYONLY` + `aws s3 cp` + retention + `status.json`), `install.ps1` (folders, ACLs, SQL grants, scheduled task), `.env.example`, `precheck.sql`. It shares nothing with `backup.sh` beyond the bucket, the S3 layout (`{S3_PREFIX}/{project}/mssql/{TS}_{db}.bak`) and the status JSON shape. Procedure, gotchas (SQL service account must own write access to the staging folder, STANDARD instead of STANDARD_IA for 15-day retention, AWS CLI on Windows Server 2012) and the deployed-server list live in `mssql/README.md`.

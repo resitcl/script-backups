@@ -318,6 +318,7 @@ tail -50 /var/log/db-backup.log
 | `status-server.service` | systemd unit for `status-server.sh` |
 | `install.sh` | One-shot installer: cron + systemd setup |
 | `.env.example` | Configuration template — copy to `.env` and fill in |
+| `mssql/` | **SQL Server on Windows** (no Docker): PowerShell backup + installer + its own README with the per-server install procedure. See [`mssql/README.md`](mssql/README.md) |
 
 ---
 
